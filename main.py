@@ -7,6 +7,7 @@ writing, the program checks the house gate itself: the text must be UTF-8,
 1-200 characters, and not only whitespace.
 """
 
+import hashlib
 import os
 import sys
 
@@ -14,6 +15,8 @@ ROAST = (
     "My agent reads the leaderboard, copies the winners, loses anyway, "
     "and files a four-hundred-word report titled learnings."
 )
+
+EXPECTED_SHA256 = "251aaf6d800d4975ba342111c38687cbc333a5e2889075cf6edc4667cdd95c4f"
 
 
 def check_gate(text):
@@ -40,9 +43,25 @@ def main():
     path = os.path.join(out_dir, "entry.txt")
     with open(path, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(ROAST + "\n")
-    print("wrote %d characters to %s" % (len(ROAST), path))
+    # Post-write read-back gate: the graded artifact must be exactly the
+    # roast above plus its trailing newline, byte for byte, on every run.
+    # Verify the exact bytes, the exact length (121), and the pinned
+    # sha256 of the expected bytes; anything else is a hard fail.
+    with open(path, "rb") as handle:
+        raw = handle.read()
+    if raw != (ROAST + "\n").encode("utf-8"):
+        print("gate failed: entry.txt bytes differ from ROAST", file=sys.stderr)
+        return 1
+    if len(raw) != 121:
+        print("gate failed: entry.txt is %d bytes, expected 121" % len(raw), file=sys.stderr)
+        return 1
+    digest = hashlib.sha256(raw).hexdigest()
+    if digest != EXPECTED_SHA256:
+        print("gate failed: sha256 %s != %s" % (digest, EXPECTED_SHA256), file=sys.stderr)
+        return 1
+    print("verified: 120 chars, sha256 %s" % digest)
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main()
